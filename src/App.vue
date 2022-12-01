@@ -104,7 +104,7 @@
             </button>
             <button
               v-if="hasNextPage"
-              @click="page = page + 1"
+              @click="page = Number(page) + 1"
               class="my-4 mx-2 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
             >
               Вперед
@@ -122,11 +122,11 @@
         <hr class="w-full border-t border-gray-600 my-4" />
         <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div
-            v-for="t in filteredTickers"
+            v-for="t in paginatedTickers"
             @click="select(t)"
             :key="t.name"
             class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
-            :class="{ 'border-4': sel === t }"
+            :class="{ 'border-4': selectedTicker === t }"
           >
             <div class="px-4 py-5 sm:p-6 text-center">
               <dt class="text-sm font-medium text-gray-500 truncate">
@@ -159,20 +159,20 @@
         </dl>
         <hr class="w-full border-t border-gray-600 my-4" />
       </template>
-      <section v-if="sel" class="relative">
+      <section v-if="selectedTicker" class="relative">
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
-          {{ sel.name }} - USD
+          {{ selectedTicker.name }} - USD
         </h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
           <div
-            v-for="(bar, index) in normalizeGraph()"
+            v-for="(bar, index) in normalizedGraph"
             :key="index"
             :style="{ height: `${bar}%` }"
             class="bg-purple-800 border w-10"
           ></div>
         </div>
         <button
-          @click="sel = null"
+          @click="selectedTicker = null"
           type="button"
           class="absolute top-0 right-0"
         >
@@ -210,7 +210,7 @@ export default {
     return {
       ticker: null,
       tickers: [],
-      sel: null,
+      selectedTicker: null,
       graph: [],
       filter: "",
       page: 1,
@@ -226,15 +226,35 @@ export default {
     },
 
     hasNextPage() {
-      return this.paginatedTickers.length > this.endIndex;
-    },
-
-    paginatedTickers() {
-      return this.tickers.filter((ticker) => ticker.name.includes(this.filter));
+      return this.filteredTickers.length > this.endIndex;
     },
 
     filteredTickers() {
-      return this.paginatedTickers.slice(this.startIndex, this.endIndex);
+      return this.tickers.filter((ticker) => ticker.name.includes(this.filter));
+    },
+
+    paginatedTickers() {
+      return this.filteredTickers.slice(this.startIndex, this.endIndex);
+    },
+
+    normalizedGraph() {
+      const maxValue = Math.max(...this.graph);
+      const minValue = Math.min(...this.graph);
+
+      if (maxValue === minValue) {
+        return this.graph.map(() => 50);
+      }
+
+      return this.graph.map(
+        (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
+      );
+    },
+
+    pageOptionsState() {
+      return {
+        page: this.page,
+        filter: this.filter,
+      };
     },
   },
   created() {
@@ -253,6 +273,7 @@ export default {
       this.tickers.forEach((ticker) => this.subscribeToTicker(ticker.name));
     }
   },
+
   methods: {
     subscribeToTicker(name) {
       setInterval(async () => {
@@ -264,7 +285,7 @@ export default {
         this.tickers.find((ticker) => ticker.name === name).price =
           data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
 
-        if (this.sel?.name === name) this.graph.push(data.USD);
+        if (this.selectedTicker?.name === name) this.graph.push(data.USD);
       }, 3000);
     },
     add() {
@@ -273,9 +294,7 @@ export default {
         price: "-",
       };
 
-      this.tickers.push(currentTicker);
-
-      localStorage.setItem("criptonomicon", JSON.stringify(this.tickers));
+      this.tickers = [...this.tickers, currentTicker];
 
       this.subscribeToTicker(currentTicker.name);
 
@@ -283,39 +302,33 @@ export default {
     },
 
     select(ticker) {
-      this.sel = ticker;
-      this.graph = [];
+      this.selectedTicker = ticker;
     },
 
     handleDelete(tickerToRemove) {
       this.tickers = this.tickers.filter((t) => t.name !== tickerToRemove.name);
-      localStorage.setItem("criptonomicon", JSON.stringify(this.tickers));
-    },
-
-    normalizeGraph() {
-      const maxValue = Math.max(...this.graph);
-      const minValue = Math.min(...this.graph);
-
-      return this.graph.map(
-        (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
-      );
+      if (tickerToRemove === this.selectedTicker) this.selectedTicker = null;
     },
   },
+
   watch: {
+    tickers() {
+      localStorage.setItem("criptonomicon", JSON.stringify(this.tickers));
+    },
+    selectedTicker() {
+      this.graph = [];
+    },
+    paginatedTickers() {
+      if (this.paginatedTickers.length === 0 && this.page > 1) this.page -= 1;
+    },
     filter() {
       this.page = 1;
-
-      window.history.pushState(
-        null,
-        document.title,
-        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
-      );
     },
-    page() {
+    pageOptionsState(value) {
       window.history.pushState(
         null,
         document.title,
-        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
+        `${window.location.pathname}?filter=${value.filter}&page=${value.page}`
       );
     },
   },
