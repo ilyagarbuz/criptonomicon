@@ -122,7 +122,7 @@
         <hr class="w-full border-t border-gray-600 my-4" />
         <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div
-            v-for="t in filteredTickers()"
+            v-for="t in filteredTickers"
             @click="select(t)"
             :key="t.name"
             class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
@@ -214,8 +214,28 @@ export default {
       graph: [],
       filter: "",
       page: 1,
-      hasNextPage: true,
     };
+  },
+  computed: {
+    startIndex() {
+      return (this.page - 1) * 3;
+    },
+
+    endIndex() {
+      return this.page * 3;
+    },
+
+    hasNextPage() {
+      return this.paginatedTickers.length > this.endIndex;
+    },
+
+    paginatedTickers() {
+      return this.tickers.filter((ticker) => ticker.name.includes(this.filter));
+    },
+
+    filteredTickers() {
+      return this.paginatedTickers.slice(this.startIndex, this.endIndex);
+    },
   },
   created() {
     const windowData = Object.fromEntries(
@@ -234,18 +254,6 @@ export default {
     }
   },
   methods: {
-    filteredTickers() {
-      const start = (this.page - 1) * 3;
-      const end = this.page * 3;
-
-      const filteredTickers = this.tickers.filter((ticker) =>
-        ticker.name.includes(this.filter)
-      );
-
-      this.hasNextPage = filteredTickers.length > end;
-
-      return filteredTickers.slice(start, end);
-    },
     subscribeToTicker(name) {
       setInterval(async () => {
         const f = await fetch(
@@ -259,7 +267,6 @@ export default {
         if (this.sel?.name === name) this.graph.push(data.USD);
       }, 3000);
     },
-
     add() {
       const currentTicker = {
         name: this.ticker,
