@@ -278,8 +278,6 @@ export default {
         });
       });
     }
-
-    // setInterval(this.updateTickers, 5000);
   },
 
   methods: {
@@ -288,6 +286,7 @@ export default {
         .filter((t) => t.name === tickerName)
         .forEach((t) => {
           t.price = tickerPrice;
+          if (t === this.selectedTicker) this.graph.push(tickerPrice);
         });
     },
 
