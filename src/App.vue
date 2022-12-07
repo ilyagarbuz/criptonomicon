@@ -163,7 +163,10 @@
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
           {{ selectedTicker.name }} - USD
         </h3>
-        <div class="flex items-end border-gray-600 border-b border-l h-64">
+        <div
+          class="flex items-end border-gray-600 border-b border-l h-64"
+          ref="graphElement"
+        >
           <div
             v-for="(bar, index) in normalizedGraph"
             :key="index"
@@ -214,6 +217,7 @@ export default {
       tickers: [],
       selectedTicker: null,
       graph: [],
+      maxGraphElements: 0,
       filter: "",
       page: 1,
     };
@@ -259,6 +263,7 @@ export default {
       };
     },
   },
+
   created() {
     const windowData = Object.fromEntries(
       new URL(window.location).searchParams.entries()
@@ -280,13 +285,31 @@ export default {
     }
   },
 
+  mounted() {
+    window.addEventListener("resize", this.calcMaxGraphElements);
+  },
+
+  beforeUnmount() {
+    window.removeEventListener("resize", this.calcMaxGraphElements);
+  },
+
   methods: {
+    calcMaxGraphElements() {
+      console.log(this.$refs.graphElement);
+      if (!this.$refs.graphElement) return;
+      this.maxGraphElements = this.$refs.graphElement.clientWidth / 38;
+    },
     updateTicker(tickerName, tickerPrice) {
       this.tickers
         .filter((t) => t.name === tickerName)
         .forEach((t) => {
           t.price = tickerPrice;
-          if (t === this.selectedTicker) this.graph.push(tickerPrice);
+          if (t === this.selectedTicker) {
+            this.graph.push(tickerPrice);
+          }
+          while (this.graph.length > this.maxGraphElements) {
+            this.graph.shift();
+          }
         });
     },
 
@@ -312,6 +335,8 @@ export default {
 
     select(ticker) {
       this.selectedTicker = ticker;
+
+      this.$nextTick().then(this.calcMaxGraphElements);
     },
 
     handleDelete(tickerToRemove) {
